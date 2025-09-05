@@ -1,0 +1,966 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Relatório Integrado Maraú — Tráfego e Vendas</title>
+
+  <!-- Tailwind via CDN -->
+  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet"/>
+
+  <!-- Montserrat -->
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+
+  <!-- Font Awesome (ícones usados nos slides) -->
+  <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet"/>
+
+  <!-- Chart.js global (para todos os gráficos dos slides) -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <style>
+    :root {
+      --bg: #1b0e10;
+      --fg: #ffffff;
+      --muted: #f1edee;
+      --accent: #ca2127;
+    }
+
+    html, body { height: 100%; }
+    body {
+      font-family: 'Montserrat', sans-serif;
+      background: var(--bg);
+      color: var(--fg);
+      margin: 0;
+      overflow: hidden;
+    }
+
+    /* palco de slides */
+    .deck {
+      position: relative;
+      width: 100vw;
+      height: 100vh;
+      overflow: hidden;
+    }
+    .slides {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      grid-auto-flow: column;
+      grid-auto-columns: 100%;
+      transition: transform 450ms ease;
+      will-change: transform;
+    }
+    .slide { width: 100%; height: 100%; overflow: hidden; }
+
+    /* container 1280x720 */
+    .slide-inner {
+      width: 1280px;
+      min-height: 720px;
+      margin: 0 auto;
+      position: relative;
+      overflow: hidden;
+      padding: 5rem; /* p-20 */
+    }
+
+    /* controles */
+    .ctrl {
+      position: absolute;
+      top: 50%;
+      transform: translateY(-50%);
+      background: rgba(0,0,0,0.25);
+      border: 1px solid rgba(255,255,255,0.15);
+      padding: 0.75rem 1rem;
+      border-radius: 0.5rem;
+      backdrop-filter: blur(3px);
+      cursor: pointer;
+      user-select: none;
+      color: var(--fg);
+    }
+    .ctrl:focus { outline: 2px solid var(--accent); outline-offset: 2px; }
+    .ctrl.prev { left: 1rem; }
+    .ctrl.next { right: 1rem; }
+
+    /* dots */
+    .dots {
+      position: absolute;
+      left: 50%;
+      bottom: 1rem;
+      transform: translateX(-50%);
+      display: flex;
+      gap: 0.5rem;
+      background: rgba(0,0,0,0.25);
+      padding: 0.5rem 0.75rem;
+      border-radius: 999px;
+      border: 1px solid rgba(255,255,255,0.12);
+      backdrop-filter: blur(3px);
+    }
+    .dot { width: 10px; height: 10px; border-radius: 999px; background: var(--muted); opacity: 0.45; border: 1px solid rgba(255,255,255,0.4); }
+    .dot[aria-current="true"] { background: var(--accent); opacity: 1; transform: scale(1.15); }
+
+    /* número da página */
+    .pagenum {
+      position: absolute;
+      right: 1rem;
+      bottom: 1rem;
+      font-size: 0.9rem;
+      color: var(--muted);
+      opacity: 0.9;
+    }
+
+    .sr-only:not(:focus):not(:focus-within) {
+      position: absolute !important;
+      width: 1px; height: 1px;
+      padding: 0; margin: -1px;
+      overflow: hidden; clip: rect(0,0,1px,1px);
+      white-space: nowrap; border: 0;
+    }
+
+    /* utilitários usados nos slides originais */
+    .accent-line { height: 4px; background: var(--accent); width: 80px; margin-bottom: 30px; }
+
+    /* caixas e elementos reutilizados nos slides */
+    .content-box { background-color: rgba(255, 255, 255, 0.05); border-left: 4px solid var(--accent); padding: 20px; border-radius: 0 8px 8px 0; margin: 15px 0; }
+    .summary-item { border-radius: 8px; padding: 20px; margin-bottom: 15px; transition: all 0.3s; background-color: rgba(255, 255, 255, 0.05); border-left: 4px solid var(--accent); }
+    .summary-item:hover { background-color: rgba(202, 33, 39, 0.1); }
+    .summary-icon { font-size: 2rem; color: var(--accent); margin-right: 20px; }
+
+    .metric-value { font-size: 2.5rem; font-weight: 700; color: var(--fg); }
+    .metric-label { font-size: 1.1rem; color: var(--muted); }
+    .chart-container { height: 220px; width: 100%; position: relative; }
+
+    .funnel-stats { display: flex; justify-content: space-between; margin-bottom: 20px; gap: 1rem; }
+    .stat-box { background-color: rgba(255, 255, 255, 0.05); border-radius: 8px; padding: 15px; text-align: center; width: 30%; }
+    .stat-number { font-size: 2.5rem; font-weight: bold; color: var(--accent); }
+
+    .table-container { background-color: rgba(255, 255, 255, 0.05); border-radius: 8px; overflow: hidden; }
+    .table-header { background-color: rgba(202, 33, 39, 0.2); }
+    .table-row:nth-child(odd) { background-color: rgba(255, 255, 255, 0.02); }
+    .table-row:hover { background-color: rgba(202, 33, 39, 0.1); }
+
+    .comparison-container { display: flex; justify-content: space-between; margin-top: 20px; gap: 1rem; }
+    .comparison-box { flex: 1; background-color: rgba(255, 255, 255, 0.05); border-radius: 8px; padding: 15px; position: relative; }
+    .comparison-box::after { content: ''; position: absolute; bottom: 0; left: 0; right: 0; height: 3px; background-color: var(--accent); border-radius: 0 0 8px 8px; }
+    .better-badge { background-color: rgba(46, 160, 67, 0.2); color: #4ade80; }
+    .worse-badge  { background-color: rgba(202, 33, 39, 0.2); color: #f87171; }
+
+    .conclusion-box { background-color: rgba(255, 255, 255, 0.05); border-left: 4px solid var(--accent); border-radius: 0 8px 8px 0; padding: 20px; }
+    .highlight-text { color: var(--accent); }
+  </style>
+</head>
+<body>
+
+  <div class="sr-only" id="instructions">
+    Use setas esquerda e direita para navegar. Home vai ao primeiro slide. End vai ao último slide. Em touch, deslize para os lados.
+  </div>
+
+  <main class="deck" role="region" aria-roledescription="carousel" aria-label="Apresentação Relatório Integrado Maraú" aria-describedby="instructions">
+    <div id="slides" class="slides" role="group" aria-live="polite">
+      
+      <!-- SLIDE 1 — Capa -->
+      <section class="slide" role="group" aria-roledescription="slide" aria-label="Capa">
+        <div class="slide-inner">
+          <img src="https://page.gensparksite.com/get_upload_url/e7465226411601316714f0f8665f4214e5f5c85216b1871ce972459e7cb16510/default/414c4859-3067-4e3b-8392-80920d6fdcad" alt="Marca" style="max-width: 100%; height: 88.0818px; width: 165.876px;">
+          <div class="max-w-3xl mt-6">
+            <h4 class="text-xl font-medium text-gray-300 mb-2">RELATÓRIO INTEGRADO</h4>
+            <h1 class="text-6xl font-bold mb-4" style="color: var(--accent);">MARAÚ</h1>
+            <h2 class="text-4xl font-semibold mb-6 text-white">TRÁFEGO E VENDAS</h2>
+            <div class="accent-line"></div>
+            <p class="text-xl mt-8 text-gray-300">
+              Relatório de desempenho de mídia, tráfego e vendas<br>
+              <span class="font-semibold text-white">Agosto de 2025</span>
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <!-- SLIDE 2 — Escopo, Período e Fontes -->
+      <section class="slide" role="group" aria-roledescription="slide" aria-label="Escopo período e fontes">
+        <div class="slide-inner">
+          <h1 class="text-4xl font-bold mb-4" style="color: var(--accent);">Escopo, Período e Fontes</h1>
+          <div class="accent-line"></div>
+          <div class="mt-8 space-y-6 text-lg max-w-3xl">
+            <div class="content-box">
+              <p><span class="font-semibold">Consolidação:</span> Dados de campanhas de Maraú com performance de mídia e funil comercial integrados.</p>
+            </div>
+            <div class="content-box">
+              <p><span class="font-semibold">Período analisado:</span> 01 a 31 de agosto de 2025.</p>
+            </div>
+            <div class="content-box">
+              <p class="font-semibold mb-2">Fontes</p>
+              <ul class="list-disc list-inside pl-4">
+                <li>Relatório OASES</li>
+                <li>Dashboard Meta Ads</li>
+                <li>Relatório Maraú (com interações e reuniões)</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- SLIDE 3 — Sumário Executivo -->
+      <section class="slide" role="group" aria-roledescription="slide" aria-label="Sumário executivo">
+        <div class="slide-inner">
+          <h1 class="text-4xl font-bold mb-4" style="color: var(--accent);">Sumário Executivo</h1>
+          <div class="accent-line"></div>
+          <div class="mt-8 grid grid-cols-2 gap-6">
+            <div class="summary-item flex items-start">
+              <i class="fas fa-chart-line summary-icon"></i>
+              <div>
+                <h3 class="text-xl font-semibold mb-2">Investimento e Alcance</h3>
+                <p class="text-gray-300">R$ 8.018,44 investidos com 568.869 impressões e alcance de 297.650 pessoas.</p>
+              </div>
+            </div>
+            <div class="summary-item flex items-start">
+              <i class="fas fa-tachometer-alt summary-icon"></i>
+              <div>
+                <h3 class="text-xl font-semibold mb-2">Eficiência de Tráfego</h3>
+                <p class="text-gray-300">CTR 1,78%, CPC médio R$ 0,79 e CPM R$ 14,10. Tráfego eficiente para o volume.</p>
+              </div>
+            </div>
+            <div class="summary-item flex items-start">
+              <i class="fas fa-users summary-icon"></i>
+              <div>
+                <h3 class="text-xl font-semibold mb-2">Geração de Demanda</h3>
+                <p class="text-gray-300">89 leads via Meta no período, com CPL médio de R$ 55,38.</p>
+              </div>
+            </div>
+            <div class="summary-item flex items-start">
+              <i class="fas fa-handshake summary-icon"></i>
+              <div>
+                <h3 class="text-xl font-semibold mb-2">Avanço Comercial</h3>
+                <p class="text-gray-300">19 reuniões realizadas a partir de 158 leads, com 11 em negociação ou análise jurídica.</p>
+              </div>
+            </div>
+            <div class="summary-item flex items-start col-span-2">
+              <i class="fas fa-trophy summary-icon"></i>
+              <div>
+                <h3 class="text-xl font-semibold mb-2">Benchmark de Performance</h3>
+                <p class="text-gray-300">Desempenho superior aos benchmarks do setor, com CTR 1,78% vs 0,99% do mercado imobiliário e CPC bem abaixo da média.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- SLIDE 4 — Investimento e Alcance – Mídia Paga -->
+      <section class="slide" role="group" aria-roledescription="slide" aria-label="Investimento e alcance">
+        <div class="slide-inner">
+          <h1 class="text-4xl font-bold mb-4" style="color: var(--accent);">Investimento e Alcance – Mídia Paga</h1>
+          <div class="accent-line"></div>
+          <div class="mt-8 grid grid-cols-2 gap-6">
+            <div class="content-box">
+              <div class="flex items-center">
+                <i class="fas fa-dollar-sign text-3xl mr-6" style="color: var(--accent);"></i>
+                <div>
+                  <div class="metric-value">R$ 8.018,44</div>
+                  <div class="metric-label">Investimento total</div>
+                </div>
+              </div>
+            </div>
+            <div class="content-box">
+              <div class="flex items-center">
+                <i class="fas fa-eye text-3xl mr-6" style="color: var(--accent);"></i>
+                <div>
+                  <div class="metric-value">568.869</div>
+                  <div class="metric-label">Impressões</div>
+                </div>
+              </div>
+            </div>
+            <div class="content-box">
+              <div class="flex items-center">
+                <i class="fas fa-users text-3xl mr-6" style="color: var(--accent);"></i>
+                <div>
+                  <div class="metric-value">297.650</div>
+                  <div class="metric-label">Alcance</div>
+                </div>
+              </div>
+            </div>
+            <div class="content-box">
+              <div class="flex items-center">
+                <i class="fas fa-sync text-3xl mr-6" style="color: var(--accent);"></i>
+                <div>
+                  <div class="metric-value">1,91</div>
+                  <div class="metric-label">Frequência média</div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="content-box mt-8">
+            <div class="flex items-start">
+              <i class="fas fa-chart-line text-2xl mr-4 mt-1" style="color: var(--accent);"></i>
+              <p class="m-0"><span class="font-semibold">Análise:</span> Os números mostram volume significativo de alcance com frequência controlada, otimizando a distribuição do investimento em mídia paga.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- SLIDE 5 — Eficiência de Tráfego -->
+      <section class="slide" role="group" aria-roledescription="slide" aria-label="Eficiência de tráfego">
+        <div class="slide-inner">
+          <h1 class="text-4xl font-bold mb-4" style="color: var(--accent);">Eficiência de Tráfego</h1>
+          <div class="accent-line"></div>
+
+          <div class="grid grid-cols-3 gap-8 mt-6">
+            <div class="content-box flex flex-col items-center text-center">
+              <i class="fas fa-mouse-pointer text-3xl mb-3" style="color: var(--accent);"></i>
+              <div class="metric-value text-3xl">1,78%</div>
+              <div class="metric-label">CTR</div>
+            </div>
+            <div class="content-box flex flex-col items-center text-center">
+              <i class="fas fa-hand-pointer text-3xl mb-3" style="color: var(--accent);"></i>
+              <div class="metric-value text-3xl">R$ 0,79</div>
+              <div class="metric-label">CPC médio</div>
+            </div>
+            <div class="content-box flex flex-col items-center text-center">
+              <i class="fas fa-eye text-3xl mb-3" style="color: var(--accent);"></i>
+              <div class="metric-value text-3xl">R$ 14,10</div>
+              <div class="metric-label">CPM</div>
+            </div>
+          </div>
+
+          <div class="content-box mt-8">
+            <div class="flex items-start">
+              <i class="fas fa-users text-2xl mr-4 mt-1" style="color: var(--accent);"></i>
+              <div>
+                <p class="font-semibold text-xl mb-2">Tráfego para seguidores:</p>
+                <div class="grid grid-cols-3 gap-4 mt-3">
+                  <div class="flex flex-col">
+                    <span class="text-2xl font-bold">8.451</span>
+                    <span class="text-sm text-gray-400">cliques</span>
+                  </div>
+                  <div class="flex flex-col">
+                    <span class="text-2xl font-bold">R$ 0,25</span>
+                    <span class="text-sm text-gray-400">CPC</span>
+                  </div>
+                  <div class="flex flex-col">
+                    <span class="text-2xl font-bold">R$ 5,75</span>
+                    <span class="text-sm text-gray-400">CPM</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="mt-8">
+            <div class="chart-container" style="height:200px;">
+              <canvas id="efficiencyChart"></canvas>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- SLIDE 6 — Geração de Demanda e Leads -->
+      <section class="slide" role="group" aria-roledescription="slide" aria-label="Geração de demanda e leads">
+        <div class="slide-inner">
+          <h1 class="text-4xl font-bold mb-4" style="color: var(--accent);">Geração de Demanda e Leads</h1>
+          <div class="accent-line"></div>
+
+          <div class="flex justify-between mt-8 mb-10">
+            <div class="text-center p-4 w-1/3">
+              <div class="metric-value" style="color: var(--accent);">89</div>
+              <div class="metric-label">leads via Meta em agosto</div>
+            </div>
+            <div class="text-center p-4 w-1/3">
+              <div class="metric-value" style="color: var(--accent);">R$ 55,38</div>
+              <div class="metric-label">CPL médio</div>
+            </div>
+            <div class="text-center p-4 w-1/3">
+              <div class="metric-value" style="color: var(--accent);">1,84%</div>
+              <div class="metric-label">CTR médio de campanhas de lead</div>
+            </div>
+          </div>
+
+          <div class="mt-4 space-y-6 text-lg">
+            <div class="content-box">
+              <div class="flex items-start">
+                <i class="fas fa-chart-line text-2xl mr-4 mt-1" style="color: var(--accent);"></i>
+                <p class="m-0"><span class="font-semibold">Campanha [LEADS][NACIONAL]:</span> 109.010 impressões, 2.009 cliques e 89 leads convertidos.</p>
+              </div>
+            </div>
+            <div class="content-box">
+              <div class="flex items-start">
+                <i class="fas fa-users text-2xl mr-4 mt-1" style="color: var(--accent);"></i>
+                <p class="m-0"><span class="font-semibold">Melhor desempenho:</span> Públicos "LAL Seguidores" (24 leads, R$ 51,40) e "LAL Video View 50%" (19 leads, R$ 42,83)</p>
+              </div>
+            </div>
+            <div class="content-box">
+              <div class="flex items-start">
+                <i class="fas fa-fire text-2xl mr-4 mt-1" style="color: var(--accent);"></i>
+                <p class="m-0"><span class="font-semibold">Aprendizado:</span> Públicos aquecidos por vídeo e lookalikes qualificados sustentam melhor eficiência na geração de demanda.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- SLIDE 7 — Funil Comercial de Maraú -->
+      <section class="slide" role="group" aria-roledescription="slide" aria-label="Funil comercial de Maraú">
+        <div class="slide-inner">
+          <h1 class="text-4xl font-bold mb-4" style="color: var(--accent);">Funil Comercial de Maraú</h1>
+          <div class="accent-line"></div>
+
+          <div class="funnel-stats mt-6">
+            <div class="stat-box">
+              <div class="stat-number">158</div>
+              <div class="text-lg font-semibold">Leads Instagram</div>
+            </div>
+            <div class="stat-box">
+              <div class="stat-number">19</div>
+              <div class="text-lg font-semibold">Reuniões Realizadas</div>
+            </div>
+            <div class="stat-box">
+              <div class="stat-number">11</div>
+              <div class="text-lg font-semibold">Em Negociação/Análise</div>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-2 gap-4 mt-4">
+            <div class="content-box">
+              <h3 class="text-xl font-semibold mb-3" style="color: var(--accent);">Distribuição dos Leads</h3>
+              <div class="chart-container" style="height:250px;">
+                <canvas id="statusChart"></canvas>
+              </div>
+            </div>
+            <div class="content-box">
+              <h3 class="text-xl font-semibold mb-3" style="color: var(--accent);">Resultado das Reuniões</h3>
+              <div class="pl-4 space-y-2">
+                <div class="flex items-center"><i class="fas fa-circle mr-2" style="color: var(--accent);"></i><span class="font-semibold">Em negociação:</span><span class="ml-2">6 (31,6%)</span></div>
+                <div class="flex items-center"><i class="fas fa-circle mr-2" style="color: var(--accent);"></i><span class="font-semibold">Análise pack jurídico:</span><span class="ml-2">5 (26,3%)</span></div>
+                <div class="flex items-center"><i class="fas fa-circle mr-2" style="color: var(--muted);"></i><span class="font-semibold">Interesse futuro:</span><span class="ml-2">3 (15,8%)</span></div>
+                <div class="flex items-center"><i class="fas fa-circle mr-2" style="color: var(--muted);"></i><span class="font-semibold">Propostas recusadas:</span><span class="ml-2">4 (21,0%)</span></div>
+                <div class="flex items-center"><i class="fas fa-circle mr-2" style="color: var(--muted);"></i><span class="font-semibold">Não qualificado:</span><span class="ml-2">1 (5,3%)</span></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="content-box mt-4">
+            <div class="flex items-start">
+              <i class="fas fa-lightbulb text-2xl mr-4 mt-1" style="color: var(--accent);"></i>
+              <p class="m-0"><span class="font-semibold">Insights:</span> 57,9% das reuniões estão em negociação ou análise jurídica, sugerindo boa aderência da proposta. A maior oportunidade está em reduzir a fatia de leads que "nunca responderam" (36,7%) e acelerar a conversão de "tentando contato" (20,3%).</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- SLIDE 8 — Benchmarks 2025 em Mídia Digital -->
+      <section class="slide" role="group" aria-roledescription="slide" aria-label="Benchmarks 2025">
+        <div class="slide-inner">
+          <h1 class="text-4xl font-bold mb-4" style="color: var(--accent);">Benchmarks 2025 em Mídia Digital</h1>
+          <div class="accent-line"></div>
+
+          <div class="grid grid-cols-2 gap-6 mt-8">
+            <div class="content-box">
+              <h2 class="text-xl font-semibold mb-3" style="color: var(--muted);">CTR (Taxa de Cliques)</h2>
+              <div class="flex justify-between items-center mt-4">
+                <div class="text-center px-4"><p class="text-sm mb-2">Global Meta</p><p class="text-3xl font-bold" style="color: var(--muted);">0,90%</p></div>
+                <div class="text-center px-4"><p class="text-sm mb-2">Imobiliário</p><p class="text-3xl font-bold" style="color: var(--muted);">0,99%</p></div>
+                <div class="text-center px-4"><p class="text-sm mb-2">Maraú</p><p class="text-3xl font-bold" style="color: var(--accent);">1,78%</p><p class="text-xs mt-1">+79,8% vs. benchmark</p></div>
+              </div>
+            </div>
+            <div class="content-box">
+              <h2 class="text-xl font-semibold mb-3" style="color: var(--muted);">CPC (Custo por Clique)</h2>
+              <div class="flex justify-between items-center mt-4">
+                <div class="text-center px-4"><p class="text-sm mb-2">Global Meta</p><p class="text-3xl font-bold" style="color: var(--muted);">US$ 1,72</p></div>
+                <div class="text-center px-4"><p class="text-sm mb-2">Imobiliário</p><p class="text-3xl font-bold" style="color: var(--muted);">US$ 1,81</p></div>
+                <div class="text-center px-4"><p class="text-sm mb-2">Maraú</p><p class="text-3xl font-bold" style="color: var(--accent);">US$ 0,16</p><p class="text-xs mt-1">-91,2% vs. benchmark</p></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="content-box mt-6">
+            <div class="flex items-start">
+              <i class="fas fa-chart-line text-2xl mr-4 mt-1" style="color: var(--accent);"></i>
+              <div>
+                <h3 class="font-semibold text-lg mb-2">Análise de Performance</h3>
+                <ul class="list-disc list-inside pl-4">
+                  <li>CTR de Maraú (1,78%) supera significativamente a média global (0,90%) e do setor imobiliário (0,99%)</li>
+                  <li>CPC de Maraú (US$ 0,16) muito abaixo da média de mercado, indicando alta eficiência de aquisição</li>
+                  <li>Performance geral de mídia digital consistentemente superior aos benchmarks internacionais de 2025</li>
+                  <li>Estratégia de públicos lookalike e criativos otimizados contribuem para resultados excepcionais</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+
+          <div class="chart-container mt-6 w-full">
+            <canvas id="benchmarkChart1"></canvas>
+          </div>
+        </div>
+      </section>
+
+      <!-- SLIDE 9 — Análise Comparativa (Benchmarks Imobiliários) -->
+      <section class="slide" role="group" aria-roledescription="slide" aria-label="Análise comparativa">
+        <div class="slide-inner">
+          <h1 class="text-4xl font-bold mb-4" style="color: var(--accent);">Análise Comparativa (Benchmarks Imobiliários)</h1>
+          <div class="accent-line"></div>
+
+          <div class="grid grid-cols-2 gap-8 mt-6">
+            <div>
+              <h3 class="text-xl font-semibold mb-4">Métricas de Mídia vs Benchmarks</h3>
+              <div class="table-container">
+                <table class="w-full text-left">
+                  <thead class="table-header">
+                    <tr>
+                      <th class="px-4 py-3 font-semibold">Métrica</th>
+                      <th class="px-4 py-3 font-semibold">Maraú</th>
+                      <th class="px-4 py-3 font-semibold">Benchmark</th>
+                      <th class="px-4 py-3 font-semibold">Comparativo</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr class="table-row">
+                      <td class="px-4 py-3 border-t border-gray-800">CTR</td>
+                      <td class="px-4 py-3 border-t border-gray-800 font-medium">1,78%</td>
+                      <td class="px-4 py-3 border-t border-gray-800">0,99%</td>
+                      <td class="px-4 py-3 border-t border-gray-800"><span class="better-badge px-2 py-1 rounded-full text-xs font-medium">+79,8%</span></td>
+                    </tr>
+                    <tr class="table-row">
+                      <td class="px-4 py-3 border-t border-gray-800">CPC (USD)</td>
+                      <td class="px-4 py-3 border-t border-gray-800 font-medium">$0,16</td>
+                      <td class="px-4 py-3 border-t border-gray-800">$1,81</td>
+                      <td class="px-4 py-3 border-t border-gray-800"><span class="better-badge px-2 py-1 rounded-full text-xs font-medium">-91,2%</span></td>
+                    </tr>
+                    <tr class="table-row">
+                      <td class="px-4 py-3 border-t border-gray-800">CPM (BRL)</td>
+                      <td class="px-4 py-3 border-t border-gray-800 font-medium">R$14,10</td>
+                      <td class="px-4 py-3 border-t border-gray-800">R$15,30</td>
+                      <td class="px-4 py-3 border-t border-gray-800"><span class="better-badge px-2 py-1 rounded-full text-xs font-medium">-7,8%</span></td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <div>
+              <h3 class="text-xl font-semibold mb-4">Métricas de Funil vs Benchmarks</h3>
+              <div class="table-container">
+                <table class="w-full text-left">
+                  <thead class="table-header">
+                    <tr>
+                      <th class="px-4 py-3 font-semibold">Etapa</th>
+                      <th class="px-4 py-3 font-semibold">Maraú</th>
+                      <th class="px-4 py-3 font-semibold">Benchmark</th>
+                      <th class="px-4 py-3 font-semibold">Comparativo</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr class="table-row">
+                      <td class="px-4 py-3 border-t border-gray-800">Taxa de contato</td>
+                      <td class="px-4 py-3 border-t border-gray-800 font-medium">63,3%</td>
+                      <td class="px-4 py-3 border-t border-gray-800">68,0%</td>
+                      <td class="px-4 py-3 border-t border-gray-800"><span class="worse-badge px-2 py-1 rounded-full text-xs font-medium">-4,7%</span></td>
+                    </tr>
+                    <tr class="table-row">
+                      <td class="px-4 py-3 border-t border-gray-800">Reuniões/Leads</td>
+                      <td class="px-4 py-3 border-t border-gray-800 font-medium">12,0%</td>
+                      <td class="px-4 py-3 border-t border-gray-800">10-20%</td>
+                      <td class="px-4 py-3 border-t border-gray-800"><span class="px-2 py-1 rounded-full text-xs font-medium bg-gray-700">Dentro da média</span></td>
+                    </tr>
+                    <tr class="table-row">
+                      <td class="px-4 py-3 border-t border-gray-800">Negociação</td>
+                      <td class="px-4 py-3 border-t border-gray-800 font-medium">57,9%</td>
+                      <td class="px-4 py-3 border-t border-gray-800">45,0%</td>
+                      <td class="px-4 py-3 border-t border-gray-800"><span class="better-badge px-2 py-1 rounded-full text-xs font-medium">+12,9%</span></td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <div class="mt-8">
+            <h3 class="text-xl font-semibold mb-4">Performance Relativa ao Mercado</h3>
+            <div class="chart-container">
+              <canvas id="benchmarkChart2"></canvas>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- SLIDE 10 — Recomendações Objetivas -->
+      <section class="slide" role="group" aria-roledescription="slide" aria-label="Recomendações">
+        <div class="slide-inner">
+          <h1 class="text-4xl font-bold mb-4" style="color: var(--accent);">Recomendações Objetivas</h1>
+          <div class="accent-line"></div>
+
+          <div class="mt-8 space-y-6 text-lg">
+            <div class="content-box">
+              <div class="flex items-start">
+                <i class="fas fa-copy text-2xl mr-4 mt-1" style="color: var(--accent);"></i>
+                <p class="m-0"><span class="font-semibold">Duplicar e expandir:</span> Conjuntos "LAL Seguidores" e "LAL Video View 50%", preservando criativos "Onde poucos têm acesso", com variações de copy de prova social e âncoras de uso inteligente do imóvel.</p>
+              </div>
+            </div>
+            <div class="content-box">
+              <div class="flex items-start">
+                <i class="fas fa-comment-dots text-2xl mr-4 mt-1" style="color: var(--accent);"></i>
+                <p class="m-0"><span class="font-semibold">Sequência de nurturing:</span> Criar sequência por WhatsApp e e-mail em três passos para resgatar "nunca respondeu" e "tentando contato", ajustando horário e oferta de valor da primeira mensagem.</p>
+              </div>
+            </div>
+            <div class="content-box">
+              <div class="flex items-start">
+                <i class="fas fa-tags text-2xl mr-4 mt-1" style="color: var(--accent);"></i>
+                <p class="m-0"><span class="font-semibold">Padronizar rastreabilidade:</span> Padronizar UTMs por casa e por objetivo, conectar eventos de "reunião marcada" e "proposta enviada" ao HubSpot para atribuição de criativo e conjunto.</p>
+              </div>
+            </div>
+            <div class="content-box">
+              <div class="flex items-start">
+                <i class="fas fa-video text-2xl mr-4 mt-1" style="color: var(--accent);"></i>
+                <p class="m-0"><span class="font-semibold">Vídeo explicativo:</span> Produzir vídeo curto com explicação do modelo jurídico e de uso, já que 5 reuniões estão em análise de pack jurídico. Inserir esse vídeo na sequência de pré-reunião e nas LPs.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- SLIDE 11 — Próximos Passos -->
+      <section class="slide" role="group" aria-roledescription="slide" aria-label="Próximos passos">
+        <div class="slide-inner">
+          <h1 class="text-4xl font-bold mb-4" style="color: var(--accent);">Próximos Passos</h1>
+          <div class="accent-line"></div>
+
+          <div class="mt-8 space-y-6 text-lg">
+            <div class="content-box">
+              <div class="flex items-start">
+                <i class="fas fa-chart-line text-2xl mr-4 mt-1" style="color: var(--accent);"></i>
+                <p class="m-0"><span class="font-semibold">Relatório Final:</span> Entrega da versão finalizada com gráficos e tabelas completos, incluindo quadro do funil integrado por objetivo de campanha e status comercial.</p>
+              </div>
+            </div>
+            <div class="content-box">
+              <div class="flex items-start">
+                <i class="fas fa-tasks text-2xl mr-4 mt-1" style="color: var(--accent);"></i>
+                <p class="m-0"><span class="font-semibold">Plano Tático:</span> Desenvolvimento do plano tático de mídia e pré-vendas para os próximos 30 dias, com metas definidas por etapa e cronograma de ações.</p>
+              </div>
+            </div>
+            <div class="content-box">
+              <div class="flex items-start">
+                <i class="fas fa-handshake text-2xl mr-4 mt-1" style="color: var(--accent);"></i>
+                <p class="m-0">
+                  <span class="font-semibold">Alinhamento Estratégico:</span>
+                  <ul class="list-disc list-inside pl-4 mt-2">
+                    <li>Ranking de criativos e conjuntos com métricas completas</li>
+                    <li>Entrega de arquivos prontos para apresentação à diretoria</li>
+                    <li>Reunião de validação e definição de novas prioridades</li>
+                  </ul>
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- SLIDE 12 — Visualizações e Fechamento -->
+      <section class="slide" role="group" aria-roledescription="slide" aria-label="Visualizações e fechamento">
+        <div class="slide-inner">
+          <h1 class="text-4xl font-bold mb-4" style="color: var(--accent);">Visualizações e Fechamento</h1>
+          <div class="accent-line"></div>
+
+          <div class="grid grid-cols-2 gap-6 mb-6">
+            <div>
+              <h3 class="text-xl font-semibold mb-3">Indicadores Principais</h3>
+              <div class="table-container">
+                <table class="w-full text-left">
+                  <thead class="table-header">
+                    <tr>
+                      <th class="px-4 py-2 font-semibold">Indicador</th>
+                      <th class="px-4 py-2 font-semibold">Resultado</th>
+                      <th class="px-4 py-2 font-semibold">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td class="px-4 py-2 border-t border-gray-800">CTR</td>
+                      <td class="px-4 py-2 border-t border-gray-800">1,78%</td>
+                      <td class="px-4 py-2 border-t border-gray-800 text-green-400"><i class="fas fa-arrow-up mr-1"></i>Acima</td>
+                    </tr>
+                    <tr>
+                      <td class="px-4 py-2 border-t border-gray-800">CPL</td>
+                      <td class="px-4 py-2 border-t border-gray-800">R$ 55,38</td>
+                      <td class="px-4 py-2 border-t border-gray-800 text-green-400"><i class="fas fa-arrow-down mr-1"></i>Eficiente</td>
+                    </tr>
+                    <tr>
+                      <td class="px-4 py-2 border-t border-gray-800">Leads → Reuniões</td>
+                      <td class="px-4 py-2 border-t border-gray-800">12,03%</td>
+                      <td class="px-4 py-2 border-t border-gray-800 text-gray-400"><i class="fas fa-equals mr-1"></i>Na média</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <div>
+              <h3 class="text-xl font-semibold mb-3">Status do Funil</h3>
+              <div class="table-container">
+                <table class="w-full text-left">
+                  <thead class="table-header">
+                    <tr>
+                      <th class="px-4 py-2 font-semibold">Etapa</th>
+                      <th class="px-4 py-2 font-semibold">Quantidade</th>
+                      <th class="px-4 py-2 font-semibold">%</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td class="px-4 py-2 border-t border-gray-800">Leads Instagram</td>
+                      <td class="px-4 py-2 border-t border-gray-800">158</td>
+                      <td class="px-4 py-2 border-t border-gray-800">100%</td>
+                    </tr>
+                    <tr>
+                      <td class="px-4 py-2 border-t border-gray-800">Reuniões realizadas</td>
+                      <td class="px-4 py-2 border-t border-gray-800">19</td>
+                      <td class="px-4 py-2 border-t border-gray-800">12,03%</td>
+                    </tr>
+                    <tr>
+                      <td class="px-4 py-2 border-t border-gray-800">Negociação/Jurídico</td>
+                      <td class="px-4 py-2 border-t border-gray-800">11</td>
+                      <td class="px-4 py-2 border-t border-gray-800">6,95%</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <div class="conclusion-box mt-4">
+            <h3 class="text-xl font-semibold mb-2 flex items-center">
+              <i class="fas fa-lightbulb mr-2 highlight-text"></i> Conclusões e Recomendações
+            </h3>
+            <div class="grid grid-cols-2 gap-4 mt-3">
+              <div>
+                <p class="mb-2"><span class="font-medium highlight-text">Mídia:</span> Desempenho superior aos benchmarks, CTR acima da média, CPC eficiente.</p>
+                <p><span class="font-medium highlight-text">Comercial:</span> Avanço promissor, oportunidades de otimização no primeiro contato.</p>
+              </div>
+              <div>
+                <p class="mb-2"><span class="font-medium highlight-text">Próximos passos:</span> Expandir públicos LAL de melhor performance, criar vídeo explicativo do modelo jurídico e otimizar cadência de contato.</p>
+              </div>
+            </div>
+          </div>
+
+          <div class="mt-6 text-center">
+            <p class="text-gray-300">Relatório desenvolvido com exclusividade para Maraú em setembro/2025</p>
+            <div class="flex justify-center items-center mt-2">
+              <div class="w-3 h-3 rounded-full bg-white mx-1"></div>
+              <div class="w-3 h-3 rounded-full mx-1" style="background-color: var(--accent);"></div>
+              <div class="w-3 h-3 rounded-full bg-white mx-1"></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+    </div>
+
+    <!-- controles -->
+    <button id="prev" class="ctrl prev" aria-label="Slide anterior" aria-controls="slides">‹</button>
+    <button id="next" class="ctrl next" aria-label="Próximo slide" aria-controls="slides">›</button>
+
+    <!-- dots -->
+    <div id="dots" class="dots" aria-hidden="true"></div>
+
+    <!-- número de página -->
+    <div id="pagenum" class="pagenum"></div>
+  </main>
+
+  <!-- Scripts de navegação e gráficos -->
+  <script>
+    // Carousel base
+    const track = document.getElementById('slides');
+    const slides = Array.from(track.children);
+    const btnPrev = document.getElementById('prev');
+    const btnNext = document.getElementById('next');
+    const dotsEl = document.getElementById('dots');
+    const pageEl = document.getElementById('pagenum');
+    let i = 0;
+
+    // cria dots
+    slides.forEach((_, idx) => {
+      const b = document.createElement('button');
+      b.className = 'dot';
+      b.type = 'button';
+      b.setAttribute('aria-label', 'Ir para o slide ' + (idx + 1));
+      b.addEventListener('click', () => go(idx));
+      dotsEl.appendChild(b);
+    });
+
+    function updateUI() {
+      const w = track.clientWidth;
+      track.style.transform = `translateX(${-i * w}px)`;
+      const dots = dotsEl.querySelectorAll('.dot');
+      dots.forEach((d, idx) => d.setAttribute('aria-current', idx === i ? 'true' : 'false'));
+      pageEl.textContent = (i + 1) + ' / ' + slides.length;
+
+      // atualiza hash
+      const newHash = '#slide=' + (i + 1);
+      if (location.hash !== newHash) history.replaceState(null, '', newHash);
+    }
+    function go(n) { i = Math.max(0, Math.min(slides.length - 1, n)); updateUI(); }
+    function next() { go(i + 1); }
+    function prev() { go(i - 1); }
+
+    btnNext.addEventListener('click', next);
+    btnPrev.addEventListener('click', prev);
+
+    // teclado
+    window.addEventListener('keydown', (e) => {
+      const k = e.key;
+      if (k === 'ArrowRight' || k === 'PageDown' || k === ' ') { e.preventDefault(); next(); }
+      if (k === 'ArrowLeft'  || k === 'PageUp') { e.preventDefault(); prev(); }
+      if (k === 'Home') { e.preventDefault(); go(0); }
+      if (k === 'End')  { e.preventDefault(); go(slides.length - 1); }
+    });
+
+    // hash inicial
+    function initFromHash() {
+      const m = location.hash.match(/slide=(\\d+)/);
+      if (m) {
+        const idx = parseInt(m[1], 10) - 1;
+        if (!Number.isNaN(idx)) i = Math.max(0, Math.min(slides.length - 1, idx));
+      }
+    }
+
+    // touch swipe
+    let touchX = null;
+    let touchTime = 0;
+    const THRESHOLD = 40;
+    const MAX_TIME  = 700;
+
+    track.addEventListener('touchstart', (e) => {
+      touchX = e.changedTouches[0].clientX;
+      touchTime = Date.now();
+    }, { passive: true });
+
+    track.addEventListener('touchend', (e) => {
+      if (touchX === null) return;
+      const dx = e.changedTouches[0].clientX - touchX;
+      const dt = Date.now() - touchTime;
+      if (dt < MAX_TIME && Math.abs(dx) > THRESHOLD) {
+        if (dx < 0) next(); else prev();
+      }
+      touchX = null;
+    });
+
+    window.addEventListener('resize', updateUI);
+    initFromHash();
+    updateUI();
+
+    // === GRÁFICOS ===
+    window.addEventListener('DOMContentLoaded', function() {
+      // Eficiência de Tráfego (slide 5)
+      const eff = document.getElementById('efficiencyChart');
+      if (eff) {
+        const ctx1 = eff.getContext('2d');
+        new Chart(ctx1, {
+          type: 'bar',
+          data: {
+            labels: ['CPC Médio', 'CPC Seguidores', 'CPM Médio', 'CPM Seguidores'],
+            datasets: [{
+              label: 'Custo (R$)',
+              data: [0.79, 0.25, 14.10, 5.75],
+              backgroundColor: [
+                'rgba(202, 33, 39, 0.8)',
+                'rgba(202, 33, 39, 0.5)',
+                'rgba(255, 255, 255, 0.8)',
+                'rgba(255, 255, 255, 0.5)'
+              ],
+              borderColor: ['#ca2127','#ca2127','#ffffff','#ffffff'],
+              borderWidth: 1
+            }]
+          },
+          options: {
+            maintainAspectRatio: false,
+            plugins: { legend: { display: false }, title: { display: true, text: 'Comparativo de Custos', color: '#ffffff', font: { family: 'Montserrat', size: 14 } } },
+            scales: {
+              y: { beginAtZero: true, grid: { color: 'rgba(255,255,255,0.1)' }, ticks: { color: '#f1edee', font: { family: 'Montserrat' } } },
+              x: { grid: { color: 'rgba(255,255,255,0.1)' }, ticks: { color: '#f1edee', font: { family: 'Montserrat' } } }
+            }
+          }
+        });
+      }
+
+      // Funil Comercial (slide 7)
+      const st = document.getElementById('statusChart');
+      if (st) {
+        const ctx2 = st.getContext('2d');
+        new Chart(ctx2, {
+          type: 'pie',
+          data: {
+            labels: ['Nunca respondeu', 'Tentando contato', 'Em andamento', 'Reunião feita', 'Outros'],
+            datasets: [{
+              data: [36.71, 20.25, 24.68, 12.03, 6.33],
+              backgroundColor: ['#ca2127', '#a41a1e', '#7c1418', '#ffffff', '#f1edee'],
+              borderWidth: 0
+            }]
+          },
+          options: {
+            responsive: true, maintainAspectRatio: false,
+            plugins: { legend: { position: 'right', labels: { color: '#ffffff', font: { family: 'Montserrat', size: 12 } } } }
+          }
+        });
+      }
+
+      // Benchmarks 2025 (slide 8)
+      const b1 = document.getElementById('benchmarkChart1');
+      if (b1) {
+        const ctx3 = b1.getContext('2d');
+        new Chart(ctx3, {
+          type: 'bar',
+          data: {
+            labels: ['CTR Global', 'CTR Imobiliário', 'CTR Maraú', 'CPC Global', 'CPC Imobiliário', 'CPC Maraú'],
+            datasets: [{
+              label: 'Performance vs Benchmarks',
+              data: [0.9, 0.99, 1.78, 1.72, 1.81, 0.16],
+              backgroundColor: [
+                'rgba(241, 237, 238, 0.5)',
+                'rgba(241, 237, 238, 0.5)',
+                'rgba(202, 33, 39, 0.7)',
+                'rgba(241, 237, 238, 0.5)',
+                'rgba(241, 237, 238, 0.5)',
+                'rgba(202, 33, 39, 0.7)'
+              ],
+              borderColor: [
+                'rgba(241, 237, 238, 1)',
+                'rgba(241, 237, 238, 1)',
+                'rgba(202, 33, 39, 1)',
+                'rgba(241, 237, 238, 1)',
+                'rgba(241, 237, 238, 1)',
+                'rgba(202, 33, 39, 1)'
+              ],
+              borderWidth: 1
+            }]
+          },
+          options: {
+            maintainAspectRatio: false,
+            scales: {
+              y: { beginAtZero: true, grid: { color: 'rgba(255,255,255,0.1)' }, ticks: { color: '#f1edee' } },
+              x: { grid: { display: false }, ticks: { color: '#f1edee' } }
+            },
+            plugins: { legend: { display: false } }
+          }
+        });
+      }
+
+      // Análise Comparativa (slide 9)
+      const b2 = document.getElementById('benchmarkChart2');
+      if (b2) {
+        const ctx4 = b2.getContext('2d');
+        new Chart(ctx4, {
+          type: 'bar',
+          data: {
+            labels: ['CTR', 'CPC', 'CPM', 'Taxa de Contato', 'Reuniões', 'Negociação'],
+            datasets: [
+              { label: 'Maraú (% do benchmark)', data: [179.8, 8.8, 92.2, 93.1, 120, 128.7], backgroundColor: '#ca2127', borderColor: '#ca2127', borderWidth: 1 },
+              { label: 'Benchmark (100%)', data: [100, 100, 100, 100, 100, 100], backgroundColor: '#f1edee', borderColor: '#f1edee', borderWidth: 1 }
+            ]
+          },
+          options: {
+            responsive: true, maintainAspectRatio: false,
+            scales: {
+              y: { beginAtZero: true, max: 200, ticks: { color: '#f1edee' }, grid: { color: 'rgba(255,255,255,0.1)' } },
+              x: { ticks: { color: '#f1edee' }, grid: { color: 'rgba(255,255,255,0.1)' } }
+            },
+            plugins: { legend: { labels: { color: '#f1edee' } } }
+          }
+        });
+      }
+    });
+  </script>
+</body>
+</html>
